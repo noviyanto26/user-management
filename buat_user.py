@@ -16,8 +16,10 @@ st.title("🔑 Manajemen User PWH")
 def _resolve_db_url() -> str:
     """Mencari DATABASE_URL dari st.secrets atau environment variables."""
     try:
-        # st.secrets.get() adalah cara modern untuk mengakses secrets
-        sec = st.secrets.get("DATABASE_URL", "")
+        # --- PERBAIKAN DI SINI ---
+        # Kita cari di dalam blok [secrets]
+        sec = st.secrets.get("secrets", {}).get("DATABASE_URL", "")
+        # --- SELESAI PERBAIKAN ---
         if sec: 
             return sec
     except Exception:
@@ -30,7 +32,7 @@ def _resolve_db_url() -> str:
     
     # Error jika tidak ditemukan di st.secrets (di Streamlit Cloud)
     st.error('DATABASE_URL tidak ditemukan di Streamlit Secrets.')
-    st.caption("Pastikan Anda sudah menambahkan `DATABASE_URL` ke Secrets di Streamlit Cloud.")
+    st.caption("Pastikan Anda sudah menambahkan `DATABASE_URL` ke dalam blok `[secrets]` di Streamlit Cloud.")
     return None
 
 @st.cache_resource(show_spinner="Menghubungkan ke database...")
@@ -67,10 +69,14 @@ def check_master_key():
     
     # 1. Dapatkan master key dari Streamlit Secrets
     try:
-        MASTER_KEY = st.secrets.get("MASTER_KEY", "")
+        # --- PERBAIKAN DI SINI ---
+        # Kita cari di dalam blok [secrets]
+        MASTER_KEY = st.secrets.get("secrets", {}).get("MASTER_KEY", "")
+        # --- SELESAI PERBAIKAN ---
+        
         if not MASTER_KEY:
             st.error("Aplikasi ini tidak dikonfigurasi dengan benar.")
-            st.caption("Admin: Harap tambahkan `MASTER_KEY` ke Streamlit Secrets.")
+            st.caption("Admin: Harap tambahkan `MASTER_KEY` ke dalam blok `[secrets]` di Streamlit Secrets.")
             st.stop()
     except Exception:
         st.error("Gagal membaca Streamlit Secrets.")
