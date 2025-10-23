@@ -62,10 +62,11 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 # --- FUNGSI BARU: Mengambil Daftar Cabang ---
 @st.cache_data(show_spinner="Memuat daftar cabang...")
 def fetch_cabang_list(_engine: Engine) -> list:
-    """Mengambil daftar unik cabang dari tabel pwh.hmhi."""
+    # --- PERBAIKAN: Ganti nama tabel di docstring ---
+    """Mengambil daftar unik cabang dari tabel pwh.hmhi_cabang."""
     try:
-        # Mengambil cabang yang unik dan tidak null, diurutkan
-        query = text("SELECT DISTINCT cabang FROM pwh.hmhi WHERE cabang IS NOT NULL ORDER BY cabang")
+        # --- PERBAIKAN: Ganti nama tabel di query ---
+        query = text("SELECT DISTINCT cabang FROM pwh.hmhi_cabang WHERE cabang IS NOT NULL ORDER BY cabang")
         with _engine.connect() as conn:
             df = pd.read_sql(query, conn) 
             
@@ -76,7 +77,8 @@ def fetch_cabang_list(_engine: Engine) -> list:
         return ["", "ALL"] + cabang_list
     except Exception as e:
         st.error(f"Gagal memuat daftar cabang: {e}")
-        st.info("Pastikan tabel 'pwh.hmhi' ada dan memiliki kolom 'cabang'.")
+        # --- PERBAIKAN: Ganti nama tabel di pesan error ---
+        st.info("Pastikan tabel 'pwh.hmhi_cabang' ada dan memiliki kolom 'cabang'.")
         return ["", "ALL"] # Fallback jika error
 
 # --------------------
