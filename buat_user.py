@@ -57,7 +57,7 @@ if DB_URL:
 else:
     st.stop()
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["bcrypt_sha256"], deprecated="auto")
 
 # --- FUNGSI BARU: Mengambil Daftar Cabang ---
 @st.cache_data(show_spinner="Memuat daftar cabang...")
