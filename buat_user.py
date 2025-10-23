@@ -1,0 +1,166 @@
+import os
+import streamlit as st
+from sqlalchemy import create_engine, text, Engine
+from sqlalchemy.exc import IntegrityError
+from passlib.context import CryptContext
+
+# --------------------
+# KONFIGURASI APLIKASI
+# --------------------
+st.set_page_config(page_title="Admin - Buat User Baru", page_icon="🔑", layout="centered")
+st.title("🔑 Manajemen User PWH")
+
+# -----------------------------
+# KONEKSI DATABASE (Disalin dari main.py)
+# -----------------------------
+def _resolve_db_url() -> str:
+    """Mencari DATABASE_URL dari st.secrets atau environment variables."""
+    try:
+        # st.secrets.get() adalah cara modern untuk mengakses secrets
+        sec = st.secrets.get("DATABASE_URL", "")
+        if sec: 
+            return sec
+    except Exception:
+        pass
+        
+    # Fallback ke os.environ jika di-deploy di tempat lain
+    env = os.environ.get("DATABASE_URL")
+    if env: 
+        return env
+    
+    # Error jika tidak ditemukan di st.secrets (di Streamlit Cloud)
+    st.error('DATABASE_URL tidak ditemukan di Streamlit Secrets.')
+    st.caption("Pastikan Anda sudah menambahkan `DATABASE_URL` ke Secrets di Streamlit Cloud.")
+    return None
+
+@st.cache_resource(show_spinner="Menghubungkan ke database...")
+def get_engine(dsn: str) -> Engine:
+    """Membuat dan menyimpan koneksi database engine."""
+    if not dsn:
+        st.stop()
+    try:
+        engine = create_engine(dsn, pool_pre_ping=True)
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return engine
+    except Exception as e:
+        st.error(f"Gagal terhubung ke database: {e}")
+        st.stop()
+
+# --- Inisialisasi Engine & Hashing ---
+DB_URL = _resolve_db_url()
+if DB_URL:
+    DB_ENGINE = get_engine(DB_URL)
+else:
+    st.stop()
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# --------------------
+# FUNGSI KEAMANAN (WAJIB!)
+# --------------------
+def check_master_key():
+    """
+    Memeriksa Master Key sebelum menampilkan form.
+    Ini MENCEGAH siapa saja membuat user admin baru.
+    """
+    
+    # 1. Dapatkan master key dari Streamlit Secrets
+    try:
+        MASTER_KEY = st.secrets.get("MASTER_KEY", "")
+        if not MASTER_KEY:
+            st.error("Aplikasi ini tidak dikonfigurasi dengan benar.")
+            st.caption("Admin: Harap tambahkan `MASTER_KEY` ke Streamlit Secrets.")
+            st.stop()
+    except Exception:
+        st.error("Gagal membaca Streamlit Secrets.")
+        st.stop()
+
+    # 2. Minta Master Key
+    st.subheader("🔒 Verifikasi Admin Utama")
+    st.warning("Halaman ini hanya untuk Super Admin.")
+    
+    master_key_input = st.text_input("Masukkan Master Key:", type="password", key="master_key_input")
+    
+    if not master_key_input:
+        st.stop()
+
+    # 3. Validasi
+    if master_key_input == MASTER_KEY:
+        st.session_state.master_auth_ok = True
+        st.success("Verifikasi berhasil.")
+    else:
+        st.error("Master Key salah.")
+        st.stop()
+
+# --------------------
+# FORMULIR UTAMA
+# --------------------
+def show_create_user_form():
+    """Menampilkan formulir untuk membuat user baru."""
+    st.subheader("➕ Buat User Baru")
+    
+    with st.form("create_user_form", clear_on_submit=True):
+        username = st.text_input("Username Baru", help="Username untuk login.")
+        
+        password = st.text_input("Password Baru", type="password", help="Password minimal 8 karakter.")
+        password_confirm = st.text_input("Konfirmasi Password", type="password")
+        
+        cabang = st.text_input("Nama Cabang", 
+                               help="Ketik 'ALL' untuk Admin, atau nama cabang persis (cth: 'JAWA BARAT')")
+        
+        submitted = st.form_submit_button("Buat User Baru", type="primary")
+
+        if submitted:
+            # Validasi input
+            if not username or not password or not cabang:
+                st.error("Semua field wajib diisi.")
+                return
+
+            if password != password_confirm:
+                st.error("Password tidak cocok. Silakan coba lagi.")
+                return
+            
+            if len(password) < 8:
+                st.error("Password terlalu pendek. Harap gunakan minimal 8 karakter.")
+                return
+
+            # Proses pembuatan user
+            try:
+                # Konversi cabang ke huruf besar untuk konsistensi
+                cabang_upper = cabang.strip().upper()
+                
+                # Buat hash password
+                hashed_password = pwd_context.hash(password)
+                
+                # Simpan ke database
+                with DB_ENGINE.begin() as conn:
+                    query = text(
+                        "INSERT INTO pwh.users (username, hashed_password, cabang) "
+                        "VALUES (:user, :pass, :branch)"
+                    )
+                    conn.execute(query, {
+                        "user": username.strip(),
+                        "pass": hashed_password,
+                        "branch": cabang_upper
+                    })
+                
+                st.success(f"Sukses! User '{username}' untuk cabang '{cabang_upper}' telah ditambahkan.")
+                
+            except IntegrityError as e:
+                # Error jika username sudah ada
+                if "unique constraint" in str(e).lower():
+                    st.error(f"Error: Username '{username}' sudah ada. Silakan gunakan username lain.")
+                else:
+                    st.error(f"Error database: {e}")
+            except Exception as e:
+                st.error(f"Terjadi error: {e}")
+
+# --------------------
+# MAIN APP LOGIC
+# --------------------
+if not st.session_state.get("master_auth_ok", False):
+    check_master_key()
+else:
+    show_create_user_form()
+
