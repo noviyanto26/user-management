@@ -145,7 +145,7 @@ def show_create_user_form():
             index=0, # Default ke "" (kosong)
             help="Pilih 'ALL' untuk Admin, atau pilih nama cabang."
         )
-        # --- SELESAI PERUBAHAN ---
+        # --- SELESAI PERBAIKAN ---
         
         submitted = st.form_submit_button("Buat User Baru", type="primary")
 
@@ -166,11 +166,14 @@ def show_create_user_form():
 
             # Proses pembuatan user
             try:
-                # Konversi cabang ke huruf besar untuk konsistensi
-                # Tidak perlu .strip().upper() lagi karena data dari selectbox
+                # --- PERBAIKAN: Truncate password ke 72 bytes ---
+                # bcrypt punya limit 72 bytes (karakter). 
+                # Kita potong manual untuk mencegah error jika password terlalu panjang.
+                password_to_hash = password[:72]
                 
                 # Buat hash password
-                hashed_password = pwd_context.hash(password)
+                hashed_password = pwd_context.hash(password_to_hash)
+                # --- SELESAI PERBAIKAN ---
                 
                 # Simpan ke database
                 with DB_ENGINE.begin() as conn:
