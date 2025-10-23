@@ -88,16 +88,16 @@ def check_master_key():
     
     master_key_input = st.text_input("Masukkan Master Key:", type="password", key="master_key_input")
     
-    if not master_key_input:
-        st.stop()
-
-    # 3. Validasi
-    if master_key_input == MASTER_KEY:
-        st.session_state.master_auth_ok = True
-        st.success("Verifikasi berhasil.")
-    else:
-        st.error("Master Key salah.")
-        st.stop()
+    # --- PERUBAHAN: Tombol Verifikasi Eksplisit ---
+    # Kita tidak lagi memvalidasi secara otomatis saat mengetik.
+    # Kita menunggu tombol ini diklik.
+    if st.button("Verifikasi Master Key", type="primary"):
+        if master_key_input == MASTER_KEY:
+            st.session_state.master_auth_ok = True
+            st.rerun() # Refresh untuk masuk ke langkah berikutnya
+        else:
+            st.error("Master Key salah.")
+            # Jangan st.stop() agar user bisa mencoba lagi
 
 # --------------------
 # FORMULIR UTAMA
@@ -165,8 +165,23 @@ def show_create_user_form():
 # --------------------
 # MAIN APP LOGIC
 # --------------------
+
+# --- PERUBAHAN: Logika 3 Langkah ---
+
+# Langkah 1: Belum terverifikasi
 if not st.session_state.get("master_auth_ok", False):
     check_master_key()
+
+# Langkah 2: Terverifikasi, tapi belum klik "Masuk"
+elif st.session_state.get("master_auth_ok", False) and not st.session_state.get("show_form", False):
+    st.success("Verifikasi berhasil.")
+    
+    # Ini adalah tombol "Login" yang Anda minta
+    if st.button("Masuk ke Halaman Admin ➔", type="primary"):
+        st.session_state.show_form = True # Set status untuk menampilkan form
+        st.rerun() # Refresh untuk menampilkan form
+
+# Langkah 3: Terverifikasi DAN sudah klik "Masuk"
 else:
     show_create_user_form()
 
