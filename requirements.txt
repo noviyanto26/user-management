@@ -2,5 +2,6 @@ pandas>=2.2
 streamlit
 SQLAlchemy
 psycopg2-binary
-passlib
-bcrypt
+bcrypt==3.2.2
+passlib==1.7.4
+
