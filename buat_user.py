@@ -1,4 +1,5 @@
 import os
+import pandas as pd  # <-- TAMBAHAN BARU
 import streamlit as st
 from sqlalchemy import create_engine, text, Engine
 from sqlalchemy.exc import IntegrityError
@@ -58,6 +59,26 @@ else:
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+# --- FUNGSI BARU: Mengambil Daftar Cabang ---
+@st.cache_data(show_spinner="Memuat daftar cabang...")
+def fetch_cabang_list(_engine: Engine) -> list:
+    """Mengambil daftar unik cabang dari tabel pwh.hmhi."""
+    try:
+        # Mengambil cabang yang unik dan tidak null, diurutkan
+        query = text("SELECT DISTINCT cabang FROM pwh.hmhi WHERE cabang IS NOT NULL ORDER BY cabang")
+        with _engine.connect() as conn:
+            df = pd.read_sql(query, conn) 
+            
+        # Konversi ke list
+        cabang_list = df['cabang'].dropna().tolist()
+        
+        # Tambahkan 'ALL' untuk Admin dan opsi kosong untuk placeholder
+        return ["", "ALL"] + cabang_list
+    except Exception as e:
+        st.error(f"Gagal memuat daftar cabang: {e}")
+        st.info("Pastikan tabel 'pwh.hmhi' ada dan memiliki kolom 'cabang'.")
+        return ["", "ALL"] # Fallback jika error
+
 # --------------------
 # FUNGSI KEAMANAN (WAJIB!)
 # --------------------
@@ -106,19 +127,29 @@ def show_create_user_form():
     """Menampilkan formulir untuk membuat user baru."""
     st.subheader("➕ Buat User Baru")
     
+    # Panggil fungsi yang sudah di-cache untuk dapatkan list cabang
+    cabang_options = fetch_cabang_list(DB_ENGINE)
+    
     with st.form("create_user_form", clear_on_submit=True):
         username = st.text_input("Username Baru", help="Username untuk login.")
         
         password = st.text_input("Password Baru", type="password", help="Password minimal 8 karakter.")
         password_confirm = st.text_input("Konfirmasi Password", type="password")
         
-        cabang = st.text_input("Nama Cabang", 
-                               help="Ketik 'ALL' untuk Admin, atau nama cabang persis (cth: 'JAWA BARAT')")
+        # --- PERUBAHAN: dari st.text_input ke st.selectbox ---
+        cabang = st.selectbox(
+            "Nama Cabang",
+            options=cabang_options,
+            index=0, # Default ke "" (kosong)
+            help="Pilih 'ALL' untuk Admin, atau pilih nama cabang."
+        )
+        # --- SELESAI PERUBAHAN ---
         
         submitted = st.form_submit_button("Buat User Baru", type="primary")
 
         if submitted:
             # Validasi input
+            # Validasi 'cabang' sekarang memeriksa apakah string-nya kosong
             if not username or not password or not cabang:
                 st.error("Semua field wajib diisi.")
                 return
@@ -134,7 +165,7 @@ def show_create_user_form():
             # Proses pembuatan user
             try:
                 # Konversi cabang ke huruf besar untuk konsistensi
-                cabang_upper = cabang.strip().upper()
+                # Tidak perlu .strip().upper() lagi karena data dari selectbox
                 
                 # Buat hash password
                 hashed_password = pwd_context.hash(password)
@@ -148,10 +179,10 @@ def show_create_user_form():
                     conn.execute(query, {
                         "user": username.strip(),
                         "pass": hashed_password,
-                        "branch": cabang_upper
+                        "branch": cabang  # Langsung gunakan nilai dari selectbox
                     })
                 
-                st.success(f"Sukses! User '{username}' untuk cabang '{cabang_upper}' telah ditambahkan.")
+                st.success(f"Sukses! User '{username}' untuk cabang '{cabang}' telah ditambahkan.")
                 
             except IntegrityError as e:
                 # Error jika username sudah ada
