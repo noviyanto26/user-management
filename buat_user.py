@@ -9,7 +9,7 @@ from passlib.context import CryptContext
 # KONFIGURASI APLIKASI
 # --------------------
 st.set_page_config(page_title="Admin - Manajemen User", page_icon="🔑", layout="centered")
-st.title("🔑 Manajemen User PWH")
+st.title("🔑 Manajemen User Registry Hemofilia Indonesia")
 
 # -----------------------------
 # KONEKSI DATABASE
